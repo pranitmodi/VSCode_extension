@@ -1,4 +1,4 @@
-# Git Commit Helper by PranitModi
+# [Git Commit Helper by PranitModi](https://marketplace.visualstudio.com/items?itemName=Blevins83.git-commit-helper-blevins)
 
 A VS Code extension that automatically extracts ticket codes from Git branch names and prefixes commit messages with them. No manual commands required - it works automatically when you type commit messages!
 
