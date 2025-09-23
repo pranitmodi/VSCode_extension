@@ -1,0 +1,91 @@
+{
+  "name": "git-commit-helper-blevins",
+  "displayName": "Git Commit Helper by PranitModi",
+  "description": "Automatically extracts ticket codes from branch names and prefixes commit messages",
+  "version": "1.0.1",
+  "publisher": "Blevins83",
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PranitModi/git-commit-helper-pm.git"
+  },
+  "license": "MIT",
+  "keywords": [
+    "git",
+    "commit",
+    "message",
+    "prefix",
+    "branch",
+    "ticket",
+    "automation",
+    "jira",
+    "workflow"
+  ],
+  "engines": {
+    "vscode": "^1.104.0"
+  },
+  "categories": [
+    "SCM Providers"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "extensionDependencies": [
+    "vscode.git"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "git-commit-helper.extractTicketCode",
+        "title": "Extract and Prefix",
+        "category": "Git Commit Helper"
+      },
+      {
+        "command": "git-commit-helper.toggleAutoPrefix",
+        "title": "Toggle Auto-Prefix",
+        "category": "Git Commit Helper"
+      }
+    ],
+    "configuration": {
+      "title": "Git Commit Helper",
+      "properties": {
+        "gitCommitHelper.autoPrefix": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically prefix commit messages with ticket codes from branch names"
+        },
+        "gitCommitHelper.ticketPattern": {
+          "type": "string",
+          "default": "([A-Za-z]+)-?(\\d+)",
+          "description": "Regular expression pattern to match ticket codes in branch names. Default pattern matches any letters followed by optional dash and numbers (e.g., PROJ-123, feature123, ABC-456, JIRA-789)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.104.0",
+    "@types/mocha": "^10.0.9",
+    "@types/node": "20.x",
+    "@typescript-eslint/eslint-plugin": "^8.7.0",
+    "@typescript-eslint/parser": "^8.7.0",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.1",
+    "eslint": "^9.11.1",
+    "typescript": "^5.6.2",
+    "webpack": "^5.95.0",
+    "webpack-cli": "^5.1.4",
+    "ts-loader": "^9.5.1"
+  }
+}
