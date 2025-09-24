@@ -2,6 +2,23 @@
 
 All notable changes to the "Git Commit Helper by PranitModi" extension will be documented in this file.
 
+## [1.0.2] - 2025-09-24
+
+### Fixed
+- **Compatibility Issue**: Lowered minimum VS Code version requirement from 1.104.0 to 1.74.0
+- Updated TypeScript compilation target from ES2022 to ES2020 for better compatibility
+- Updated ECMAScript version in ESLint config from 2022 to 2020
+- Changed TypeScript module system from Node16 to CommonJS for broader support
+
+### Changed
+- Extension now supports VS Code versions 1.74.0 and above (November 2022+)
+- Updated @types/vscode dependency to match minimum version requirement
+- More compatible build configuration for older VS Code installations
+
+### Notes
+- This version maintains all existing functionality while supporting a much wider range of VS Code versions
+- All features tested and working on VS Code 1.74.0+
+
 ## [1.0.1] - 2025-09-24
 
 ### Added

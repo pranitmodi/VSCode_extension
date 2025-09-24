@@ -35,7 +35,7 @@ The extension automatically detects ticket codes from your branch names and pref
 
 Install directly from the VS Code Marketplace:
 
-1. Open VS Code
+1. Open VS Code (version 1.74.0 or newer)
 2. Go to Extensions (Ctrl+Shift+X)
 3. Search for "Git Commit Helper by PranitModi"
 4. Click Install
@@ -44,6 +44,12 @@ Or install via command line:
 ```bash
 code --install-extension PranitModi.git-commit-helper-pm
 ```
+
+### 📋 Requirements
+
+- VS Code version 1.74.0 or newer (November 2022+)
+- Git extension (built-in with VS Code)
+- An active Git repository
 
 ## ⚙️ Configuration
 

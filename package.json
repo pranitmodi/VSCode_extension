@@ -2,7 +2,7 @@
   "name": "git-commit-helper-blevins",
   "displayName": "Git Commit Helper by PranitModi",
   "description": "Automatically extracts ticket codes from branch names and prefixes commit messages",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "publisher": "Blevins83",
   "icon": "icon.png",
   "repository": {
@@ -22,7 +22,7 @@
     "workflow"
   ],
   "engines": {
-    "vscode": "^1.104.0"
+    "vscode": "^1.74.0"
   },
   "categories": [
     "SCM Providers"
@@ -75,7 +75,7 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.104.0",
+    "@types/vscode": "^1.74.0",
     "@types/mocha": "^10.0.9",
     "@types/node": "20.x",
     "@typescript-eslint/eslint-plugin": "^8.7.0",
