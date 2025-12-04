@@ -1,8 +1,8 @@
 {
   "name": "git-commit-helper-blevins",
   "displayName": "Git Commit Helper by PranitModi",
-  "description": "Automatically extracts ticket codes from branch names and prefixes commit messages",
-  "version": "1.0.2",
+  "description": "Automatically extracts ticket codes from branch names, prefixes commit messages, and formats AI-generated messages",
+  "version": "1.0.3",
   "publisher": "Blevins83",
   "icon": "icon.png",
   "repository": {
@@ -19,7 +19,11 @@
     "ticket",
     "automation",
     "jira",
-    "workflow"
+    "workflow",
+    "copilot",
+    "ai",
+    "github copilot",
+    "smart commit"
   ],
   "engines": {
     "vscode": "^1.74.0"
@@ -45,6 +49,11 @@
         "command": "git-commit-helper.toggleAutoPrefix",
         "title": "Toggle Auto-Prefix",
         "category": "Git Commit Helper"
+      },
+      {
+        "command": "git-commit-helper.generateSmartMessage",
+        "title": "Generate Smart Commit Message",
+        "category": "Git Commit Helper"
       }
     ],
     "configuration": {
@@ -59,6 +68,27 @@
           "type": "string",
           "default": "([A-Za-z]+)-?(\\d+)",
           "description": "Regular expression pattern to match ticket codes in branch names. Default pattern matches any letters followed by optional dash and numbers (e.g., PROJ-123, feature123, ABC-456, JIRA-789)"
+        },
+        "gitCommitHelper.autoCondenseAI": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically condense AI-generated commit messages to one-line format with ticket prefix"
+        },
+        "gitCommitHelper.condensingStrategy": {
+          "type": "string",
+          "default": "smart",
+          "enum": ["smart", "first-sentence", "first-line"],
+          "enumDescriptions": [
+            "Smart condensing: Extract key action, handle conventional commits, and intelligently truncate",
+            "Use only the first sentence from the AI-generated message",
+            "Use only the first line from the AI-generated message"
+          ],
+          "description": "Strategy for condensing AI-generated commit messages to single-line format"
+        },
+        "gitCommitHelper.autoGenerateOnStage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically generate commit message when files are staged (requires GitHub Copilot)"
         }
       }
     }
@@ -68,6 +98,7 @@
     "compile": "webpack",
     "watch": "webpack --watch",
     "package": "webpack --mode production --devtool hidden-source-map",
+    "package-extension": "vsce package",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",

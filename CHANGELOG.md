@@ -2,6 +2,36 @@
 
 All notable changes to the "Git Commit Helper by PranitModi" extension will be documented in this file.
 
+## [1.0.3] - 2025-12-04
+
+### Added
+- **Auto-Prefix on Staging**: Automatically adds ticket prefix (e.g., `PROJ-123: `) when files are staged, ready for you to start typing
+- **GitHub Copilot Integration**: Automatically detects and formats AI-generated commit messages from Copilot
+- **Smart Message Condensing**: Condenses verbose Copilot messages to concise one-liners with ticket prefix
+- **Configurable Condensing Strategies**: Choose between 'smart', 'first-sentence', or 'first-line' strategies
+- **New Settings**:
+  - `gitCommitHelper.autoCondenseAI` - Auto-format Copilot messages (default: true)
+  - `gitCommitHelper.condensingStrategy` - Choose condensing strategy (default: 'smart')
+  - `gitCommitHelper.autoGenerateOnStage` - Show ticket prefix when staging (default: true)
+
+### Changed
+- Improved AI-generated message detection for better Copilot sparkle button integration
+- Enhanced logging for debugging staged changes and message generation
+- Better error handling with fallback to ticket prefix only when AI is unavailable
+
+### Features
+- Works seamlessly with or without GitHub Copilot
+- Stage files → Ticket prefix appears automatically → Start typing
+- Use Copilot sparkle button → Extension formats message with ticket prefix
+- Smart condensing preserves conventional commit formats
+- Zero AI calls when manually typing (minimizes API usage)
+
+### Technical
+- Added multiple command name detection for Copilot compatibility
+- Improved message detection heuristics for AI-generated content
+- Enhanced repository state tracking for staged changes
+- Better separation between manual and AI-generated workflows
+
 ## [1.0.2] - 2025-09-24
 
 ### Fixed

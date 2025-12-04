@@ -1,24 +1,36 @@
 # [Git Commit Helper by PranitModi](https://marketplace.visualstudio.com/items?itemName=Blevins83.git-commit-helper-blevins)
 
-A VS Code extension that automatically extracts ticket codes from Git branch names and prefixes commit messages with them. No manual commands required - it works automatically when you type commit messages!
+A VS Code extension that automatically extracts ticket codes from Git branch names, prefixes commit messages, and formats AI-generated messages. Stage files and start typing - the ticket prefix appears automatically!
 
 ## ✨ Features
 
-- **Universal Detection**: Automatically detects ANY ticket pattern from branch names (PROJ-123, TASK-456, JIRA-789, ABC-999, etc.)
-- **Auto-Prefixing**: Automatically adds ticket codes to commit messages as you type
+- **Auto-Prefix on Staging**: Ticket prefix appears automatically when you stage files - just start typing!
+- **GitHub Copilot Integration**: Automatically formats Copilot-generated messages with ticket prefix
+- **Smart Message Condensing**: Condenses verbose AI messages to concise one-liners
+- **Universal Detection**: Detects ANY ticket pattern from branch names (PROJ-123, TASK-456, JIRA-789, etc.)
 - **Smart Pattern Recognition**: Works with any word followed by numbers, with or without dashes
-- **Fully Configurable**: Customize patterns for your specific workflow
-- **Smart Prevention**: Prevents duplicate prefixes and respects existing messages
+- **Fully Configurable**: Customize patterns and AI formatting strategies
 - **Zero Configuration**: Works out of the box - detects common patterns automatically
 
 ## 🚀 How It Works
 
-The extension automatically detects ticket codes from your branch names and prefixes your commit messages:
+### Basic Workflow
 
-1. Create a branch with ANY ticket pattern: `feature/PROJ-123-description` or `bugfix/ABC456-fix`
-2. Open Source Control (Ctrl+Shift+G)
-3. Start typing your commit message
-4. The extension automatically prefixes it with `PROJ-123: ` or `ABC-456: `
+1. **Checkout a branch** with ticket pattern: `feature/PROJ-123-new-feature`
+2. **Stage your files** → `PROJ-123: ` appears automatically in commit message box
+3. **Either:**
+   - Type your message manually: `PROJ-123: Add user authentication`
+   - Click Copilot sparkle button (✨) → Extension formats it: `PROJ-123: Add user authentication feature`
+
+### 🤖 With GitHub Copilot
+
+When you use Copilot's sparkle button to generate commit messages:
+1. Click the sparkle icon (✨) in Source Control
+2. Copilot generates a message (often multi-line or verbose)
+3. Extension automatically:
+   - Detects the AI-generated message
+   - Condenses it to one concise line
+   - Adds your ticket prefix: `PROJ-123: condensed message`
 
 ### 🎯 Supported Branch Patterns (All Automatic!)
 
@@ -58,7 +70,10 @@ The extension works automatically without any configuration, but you can customi
 ```json
 {
   "gitCommitHelper.autoPrefix": true,
-  "gitCommitHelper.ticketPattern": "([A-Za-z]+)-?(\\d+)"
+  "gitCommitHelper.ticketPattern": "([A-Za-z]+)-?(\\d+)",
+  "gitCommitHelper.autoGenerateOnStage": true,
+  "gitCommitHelper.autoCondenseAI": true,
+  "gitCommitHelper.condensingStrategy": "smart"
 }
 ```
 
@@ -68,6 +83,15 @@ The extension works automatically without any configuration, but you can customi
 |---------|---------|-------------|
 | `gitCommitHelper.autoPrefix` | `true` | Enable/disable automatic prefixing |
 | `gitCommitHelper.ticketPattern` | `"([A-Za-z]+)-?(\\d+)"` | Regex pattern to match ticket codes |
+| `gitCommitHelper.autoGenerateOnStage` | `true` | Show ticket prefix when files are staged |
+| `gitCommitHelper.autoCondenseAI` | `true` | Auto-format Copilot-generated messages |
+| `gitCommitHelper.condensingStrategy` | `"smart"` | Strategy for condensing AI messages: `smart`, `first-sentence`, or `first-line` |
+
+### 🤖 AI Condensing Strategies
+
+- **smart** (recommended): Intelligently extracts key action, handles conventional commits, preserves intent
+- **first-sentence**: Uses only the first sentence from Copilot's message
+- **first-line**: Uses only the first line from Copilot's message
 
 ### 🔧 Pattern Examples
 
@@ -98,6 +122,7 @@ While the extension works automatically, these commands are available:
 
 - `Git Commit Helper: Extract and Prefix` - Manually extract and prefix current message
 - `Git Commit Helper: Toggle Auto-Prefix` - Enable/disable automatic prefixing
+- `Git Commit Helper: Generate Smart Commit Message` - Manually trigger AI message generation (requires GitHub Copilot)
 
 ##  Troubleshooting
 
@@ -120,26 +145,28 @@ To support different ticket formats, update the `ticketPattern` setting:
 ## 📊 Example Usage
 
 ```bash
-# Works with ANY pattern automatically!
+# Stage files and see ticket prefix automatically!
 
-# Example 1: Traditional JIRA style
+# Example 1: Manual typing
 git checkout -b feature/PROJ-123-add-authentication
-# VS Code: Type "Add user login" → Becomes "PROJ-123: Add user login"
+# Stage files → "PROJ-123: " appears
+# Type: "Add user login feature" 
+# Result: "PROJ-123: Add user login feature"
 
-# Example 2: GitHub issue style  
-git checkout -b fix/issue456-fix-bug
-# VS Code: Type "Fix critical bug" → Becomes "ISSUE-456: Fix critical bug"
+# Example 2: With Copilot
+git checkout -b bugfix/TASK-456-fix-bug
+# Stage files → "TASK-456: " appears
+# Click sparkle icon (✨) → Copilot generates verbose message
+# Extension condenses and formats: "TASK-456: Fix authentication bug in login flow"
 
-# Example 3: Custom team pattern
-git checkout -b hotfix/ABC999-urgent-patch
-# VS Code: Type "Emergency patch" → Becomes "ABC-999: Emergency patch"
-
-# Example 4: Lowercase patterns
-git checkout -b bugfix/task123-performance
-# VS Code: Type "Improve speed" → Becomes "TASK-123: Improve speed"
+# Example 3: Multiple staged files
+git checkout -b feature/ABC-999-update-ui
+# Stage multiple files
+# Click sparkle icon → Copilot analyzes all changes
+# Extension creates: "ABC-999: Update UI components and styles"
 ```
 
-**🎯 The extension automatically detects and formats ANY pattern!**
+**🎯 Works with ANY branch pattern and minimizes AI calls!**
 
 ## 🤝 Contributing
 

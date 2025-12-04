@@ -26,10 +26,35 @@ interface SourceControlInputBox {
 
 interface RepositoryState {
 	readonly HEAD: Branch | undefined;
+	readonly indexChanges: Change[];
 }
 
 interface Branch {
 	readonly name: string;
+}
+
+interface Change {
+	readonly uri: vscode.Uri;
+	readonly status: Status;
+}
+
+enum Status {
+	INDEX_MODIFIED,
+	INDEX_ADDED,
+	INDEX_DELETED,
+	INDEX_RENAMED,
+	INDEX_COPIED,
+	MODIFIED,
+	DELETED,
+	UNTRACKED,
+	IGNORED,
+	ADDED_BY_US,
+	ADDED_BY_THEM,
+	DELETED_BY_US,
+	DELETED_BY_THEM,
+	BOTH_ADDED,
+	BOTH_DELETED,
+	BOTH_MODIFIED
 }
 
 /**
@@ -41,6 +66,11 @@ class GitCommitHelper {
 	private disposables: vscode.Disposable[] = [];
 	private isEnabled: boolean = true;
 	private repositories = new Map<string, Repository>();
+	private isGeneratingAIMessage = false;
+	private lastAIGeneratedMessage: string = '';
+	private aiMessageTimestamp: number = 0;
+	private stagedFilesCount = new Map<string, number>();
+	private isAutoGenerating = new Map<string, boolean>();
 
 	constructor(private context: vscode.ExtensionContext) {
 		this.initialize();
@@ -134,12 +164,18 @@ class GitCommitHelper {
 	private onRepositoryOpened(repository: Repository): void {
 		const repoKey = repository.rootUri.toString();
 		this.repositories.set(repoKey, repository);
+		this.stagedFilesCount.set(repoKey, 0);
+		this.isAutoGenerating.set(repoKey, false);
 
 		console.log(`📂 Repository opened: ${repoKey}`);
 
 		// Set up input box value change listener for this repository
 		const inputBoxDisposable = this.setupInputBoxListener(repository);
 		this.disposables.push(inputBoxDisposable);
+
+		// Set up staged changes monitor
+		const stagedChangesDisposable = this.setupStagedChangesMonitor(repository);
+		this.disposables.push(stagedChangesDisposable);
 
 		// Immediately check if we can extract a ticket code
 		const ticketCode = this.extractTicketCode(repository);
@@ -167,7 +203,77 @@ class GitCommitHelper {
 	private onRepositoryClosed(repository: Repository): void {
 		const repoKey = repository.rootUri.toString();
 		this.repositories.delete(repoKey);
+		this.stagedFilesCount.delete(repoKey);
+		this.isAutoGenerating.delete(repoKey);
 		console.log(`Repository closed: ${repoKey}`);
+	}
+
+	/**
+	 * Set up monitor for staged changes to auto-generate commit messages
+	 */
+	private setupStagedChangesMonitor(repository: Repository): vscode.Disposable {
+		const repoKey = repository.rootUri.toString();
+		console.log(`👀 Setting up staged changes monitor for repository: ${repoKey}`);
+
+		// Poll for staged changes every 2 seconds
+		const checkStagedChanges = async () => {
+			try {
+				const config = vscode.workspace.getConfiguration('gitCommitHelper');
+				const autoGenerate = config.get<boolean>('autoGenerateOnStage', true);
+				
+				if (!autoGenerate) {
+					console.log('⏭️ Auto-generate on stage is disabled');
+					return;
+				}
+
+				const stagedChanges = repository.state.indexChanges || [];
+				const currentCount = stagedChanges.length;
+				const previousCount = this.stagedFilesCount.get(repoKey) || 0;
+				const isGenerating = this.isAutoGenerating.get(repoKey) || false;
+
+				console.log(`🔍 Checking staged changes - Current: ${currentCount}, Previous: ${previousCount}, Generating: ${isGenerating}`);
+
+			// Trigger when: 
+			// 1. Staged files increased (new files added)
+			// 2. We have at least 1 staged file
+			// 3. Not already generating
+			if (currentCount > previousCount && currentCount > 0 && !isGenerating) {
+				console.log(`📦 Staged files increased from ${previousCount} to ${currentCount}`);
+				if (stagedChanges.length > 0) {
+					console.log(`📄 Staged files:`, stagedChanges.map(c => c.uri.fsPath));
+				}
+				
+				// Always add ticket prefix when staging files (if input is empty)
+				const inputValue = repository.inputBox.value.trim();
+				const ticketCode = this.extractTicketCode(repository);
+				
+				if (ticketCode && inputValue === '') {
+					console.log(`📝 Adding ticket prefix for user to start typing: ${ticketCode}:`);
+					repository.inputBox.value = `${ticketCode}: `;
+				}
+			} else if (currentCount !== previousCount) {
+				console.log(`⏭️ Skipping: currentCount=${currentCount}, previousCount=${previousCount}, isGenerating=${isGenerating}`);
+			}				// Update count
+				this.stagedFilesCount.set(repoKey, currentCount);
+			} catch (error) {
+				console.error('❌ Error checking staged changes:', error);
+				if (error instanceof Error) {
+					console.error('Error details:', error.message, error.stack);
+				}
+			}
+		};
+
+		// Check immediately
+		setTimeout(checkStagedChanges, 1000);
+
+		// Check every 2 seconds
+		const interval = setInterval(checkStagedChanges, 2000);
+
+		console.log(`✅ Staged changes monitor set up for ${repoKey}`);
+
+		return new vscode.Disposable(() => {
+			clearInterval(interval);
+		});
 	}
 
 	/**
@@ -193,6 +299,17 @@ class GitCommitHelper {
 			
 			if (!autoPrefix) {
 				console.log('⚠️ Auto-prefix is disabled in settings');
+				return;
+			}
+
+			// Check if this is an AI-generated message (multi-line or long message)
+			const isAIGenerated = this.detectAIGeneratedMessage(newValue, lastValue);
+			if (isAIGenerated) {
+				console.log('🤖 AI-generated message detected, processing...');
+				this.processAIGeneratedMessage(repository, newValue);
+				isUpdating = true;
+				hasAddedPrefix = true;
+				setTimeout(() => { isUpdating = false; }, 500);
 				return;
 			}
 
@@ -320,6 +437,259 @@ class GitCommitHelper {
 	}
 
 	/**
+	 * Detect if a message was AI-generated (multi-line or suddenly long message)
+	 */
+	private detectAIGeneratedMessage(newValue: string, oldValue: string): boolean {
+		const config = vscode.workspace.getConfiguration('gitCommitHelper');
+		const autoCondense = config.get<boolean>('autoCondenseAI', true);
+		
+		if (!autoCondense || this.isGeneratingAIMessage) {
+			return false;
+		}
+
+		// Check if message has multiple lines (Copilot often generates multi-line messages)
+		const hasMultipleLines = newValue.includes('\n') && newValue.split('\n').length > 1;
+		
+		// Check if message suddenly became long (>80 chars) from short (less than ticket prefix)
+		const ticketCode = this.extractTicketCode(this.getActiveRepository()!);
+		const minLength = ticketCode ? ticketCode.length + 10 : 20;
+		const suddenlyLong = oldValue.length < minLength && newValue.length > 80;
+		
+		// Check if it's different from last AI message (avoid reprocessing)
+		const isDifferent = newValue !== this.lastAIGeneratedMessage;
+		
+		// Check if message doesn't already have ticket prefix at start (indicating user typed it)
+		const startsWithPrefix = ticketCode && newValue.startsWith(`${ticketCode}: `);
+		const isCopilotGenerated = !startsWithPrefix && (hasMultipleLines || suddenlyLong);
+		
+		if (isCopilotGenerated && isDifferent) {
+			console.log(`🤖 Copilot-generated message detected! Multi-line: ${hasMultipleLines}, Length: ${newValue.length}`);
+			return true;
+		}
+		
+		return false;
+	}
+
+	/**
+	 * Process AI-generated message: condense and add ticket prefix
+	 */
+	private processAIGeneratedMessage(repository: Repository, aiMessage: string): void {
+		const config = vscode.workspace.getConfiguration('gitCommitHelper');
+		const strategy = config.get<string>('condensingStrategy', 'smart');
+		
+		console.log(`🎨 Processing Copilot-generated message (length: ${aiMessage.length})`);
+		
+		// Condense the message
+		const condensed = this.condenseToOneLine(aiMessage, strategy);
+		console.log(`📝 Condensed message: "${condensed}"`);
+		
+		// Add ticket prefix
+		const ticketCode = this.extractTicketCode(repository);
+		if (ticketCode) {
+			const finalMessage = `${ticketCode}: ${condensed}`;
+			console.log(`✅ Final formatted message: "${finalMessage}"`);
+			this.lastAIGeneratedMessage = finalMessage;
+			this.aiMessageTimestamp = Date.now();
+			repository.inputBox.value = finalMessage;
+		} else {
+			console.log('⚠️ No ticket code found, using condensed message without prefix');
+			this.lastAIGeneratedMessage = condensed;
+			repository.inputBox.value = condensed;
+		}
+	}
+
+	/**
+	 * Ensure ticket prefix is visible when input box is focused or empty
+	 */
+	private ensureTicketPrefix(repository: Repository): void {
+		const ticketCode = this.extractTicketCode(repository);
+		if (!ticketCode) {
+			return;
+		}
+
+		const currentValue = repository.inputBox.value;
+		const expectedPrefix = `${ticketCode}: `;
+
+		// If input is empty, add the prefix
+		if (currentValue === '') {
+			console.log(`📝 Adding ticket prefix: ${expectedPrefix}`);
+			repository.inputBox.value = expectedPrefix;
+		}
+	}
+
+	/**
+	 * Condense multi-line or verbose message to single-line conventional commit format
+	 */
+	private condenseToOneLine(message: string, strategy: string): string {
+		if (!message) {
+			return '';
+		}
+
+		// Remove leading/trailing whitespace
+		let cleaned = message.trim();
+		
+		if (strategy === 'first-sentence') {
+			// Extract first sentence only
+			const firstLine = cleaned.split('\n')[0];
+			const firstSentence = firstLine.split(/[.!?]/)[0].trim();
+			return firstSentence || firstLine;
+		}
+		
+		if (strategy === 'smart') {
+			// Smart condensing: extract key action from first line
+			const lines = cleaned.split('\n').filter(line => line.trim().length > 0);
+			const firstLine = lines[0];
+			
+			// If first line is already concise (<72 chars), use it
+			if (firstLine.length <= 72) {
+				return firstLine;
+			}
+			
+			// Try to extract conventional commit format (type: description)
+			const conventionalMatch = firstLine.match(/^(\w+)(\([^)]+\))?:\s*(.+)$/);
+			if (conventionalMatch) {
+				const type = conventionalMatch[1];
+				const description = conventionalMatch[3];
+				// Take first part of description if too long
+				const shortDesc = description.length > 50 ? description.substring(0, 50).trim() + '...' : description;
+				return `${type}: ${shortDesc}`;
+			}
+			
+			// Extract first meaningful phrase (up to first comma or 60 chars)
+			const phrases = firstLine.split(',');
+			const firstPhrase = phrases[0].trim();
+			return firstPhrase.length > 60 ? firstPhrase.substring(0, 60).trim() + '...' : firstPhrase;
+		}
+		
+		// Default: just use first line, truncate if needed
+		const firstLine = cleaned.split('\n')[0];
+		return firstLine.length > 72 ? firstLine.substring(0, 72).trim() + '...' : firstLine;
+	}
+
+	/**
+	 * Generate smart commit message for a specific repository
+	 */
+	private async generateSmartMessageForRepo(repository: Repository): Promise<void> {
+		try {
+			// Check if there are staged changes
+			const stagedChanges = repository.state.indexChanges || [];
+			if (stagedChanges.length === 0) {
+				console.log('⚠️ No staged changes found, skipping generation');
+				return;
+			}
+
+			console.log(`🚀 Auto-generating smart commit message for ${stagedChanges.length} staged files...`);
+			console.log(`📄 Staged files:`, stagedChanges.map(c => c.uri.fsPath));
+			
+			// Check available commands
+			const commands = await vscode.commands.getCommands();
+			console.log('🔍 Checking available Git/Copilot commands...');
+			
+			// Try different possible command names
+			const possibleCommands = [
+				'git.generateCommitMessage',
+				'workbench.action.generateCommitMessage', 
+				'_workbench.generateCommitMessage',
+				'github.copilot.generateCommitMessage'
+			];
+			
+			let commandToUse: string | undefined;
+			for (const cmd of possibleCommands) {
+				if (commands.includes(cmd)) {
+					commandToUse = cmd;
+					console.log(`✅ Found command: ${cmd}`);
+					break;
+				}
+			}
+			
+			if (!commandToUse) {
+				console.log('⚠️ No commit message generation command found. Available Git commands:');
+				const gitCommands = commands.filter(c => c.includes('git') || c.includes('commit') || c.includes('copilot'));
+				console.log(gitCommands.slice(0, 20).join(', '));
+				console.log('⚠️ GitHub Copilot commit message generation not available.');
+				
+				// Fallback: Just add the ticket prefix without AI generation
+				const ticketCode = this.extractTicketCode(repository);
+				if (ticketCode && repository.inputBox.value === '') {
+					repository.inputBox.value = `${ticketCode}: `;
+					console.log(`📝 Added ticket prefix: ${ticketCode}:`);
+				}
+				return;
+			}
+			
+			// Set flag to prevent auto-processing during generation
+			this.isGeneratingAIMessage = true;
+			
+			// Clear input box before generation
+			const previousValue = repository.inputBox.value;
+			console.log(`📝 Current input box value: "${previousValue}"`);
+			
+			// Call the commit message generation command
+			console.log(`📞 Calling ${commandToUse}...`);
+			await vscode.commands.executeCommand(commandToUse);
+			console.log('✅ Command executed');
+			
+			// Wait a bit for the message to be populated
+			await new Promise(resolve => setTimeout(resolve, 2000));
+			
+			// Get the generated message
+			const generatedMessage = repository.inputBox.value;
+			console.log(`📥 Copilot generated: "${generatedMessage}"`);
+			
+			if (generatedMessage && generatedMessage.length > 0 && generatedMessage !== previousValue) {
+				// Process the AI-generated message
+				this.processAIGeneratedMessage(repository, generatedMessage);
+				console.log('✅ Auto-generated smart commit message!');
+			} else {
+				console.log('⚠️ Copilot did not generate a message or message unchanged');
+				console.log(`Previous: "${previousValue}", Generated: "${generatedMessage}"`);
+				
+				// Fallback: Just add the ticket prefix
+				const ticketCode = this.extractTicketCode(repository);
+				if (ticketCode && generatedMessage === '') {
+					repository.inputBox.value = `${ticketCode}: `;
+					console.log(`📝 Added ticket prefix as fallback: ${ticketCode}:`);
+				}
+			}
+			
+			// Reset flag
+			this.isGeneratingAIMessage = false;
+		} catch (error) {
+			console.error('❌ Error generating smart message:', error);
+			if (error instanceof Error) {
+				console.error('Error details:', error.message, error.stack);
+			}
+			this.isGeneratingAIMessage = false;
+		}
+	}
+
+	/**
+	 * Generate smart commit message using Copilot, then condense and prefix
+	 */
+	public async generateSmartMessage(): Promise<void> {
+		try {
+			const activeRepo = this.getActiveRepository();
+			if (!activeRepo) {
+				vscode.window.showWarningMessage('No active Git repository found.');
+				return;
+			}
+
+			// Check if there are staged changes
+			const stagedChanges = activeRepo.state.indexChanges || [];
+			if (stagedChanges.length === 0) {
+				vscode.window.showWarningMessage('No staged changes found. Stage some changes first.');
+				return;
+			}
+
+			await this.generateSmartMessageForRepo(activeRepo);
+			vscode.window.showInformationMessage('✨ Smart commit message generated!');
+		} catch (error) {
+			console.error('❌ Error generating smart message:', error);
+			vscode.window.showErrorMessage(`Failed to generate smart message: ${error}`);
+		}
+	}
+
+	/**
 	 * Toggle the auto-prefix functionality
 	 */
 	public toggleAutoPrefix(): void {
@@ -375,6 +745,8 @@ class GitCommitHelper {
 		this.disposables.forEach(d => d.dispose());
 		this.disposables = [];
 		this.repositories.clear();
+		this.stagedFilesCount.clear();
+		this.isAutoGenerating.clear();
 	}
 }
 
@@ -402,8 +774,14 @@ export function activate(context: vscode.ExtensionContext) {
 			gitCommitHelper?.toggleAutoPrefix();
 		});
 
+		// Register command to generate smart commit message
+		const generateSmartCommand = vscode.commands.registerCommand('git-commit-helper.generateSmartMessage', async () => {
+			console.log('✨ Generate smart commit message command triggered');
+			await gitCommitHelper?.generateSmartMessage();
+		});
+
 		// Add disposables to context
-		context.subscriptions.push(extractCommand, toggleCommand);
+		context.subscriptions.push(extractCommand, toggleCommand, generateSmartCommand);
 		
 		console.log('🎉 Git Commit Helper extension is now active!');
 	} catch (error) {
