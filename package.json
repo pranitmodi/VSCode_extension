@@ -1,8 +1,8 @@
 {
   "name": "git-commit-helper-blevins",
   "displayName": "Git Commit Helper by PranitModi",
-  "description": "Automatically extracts ticket codes from branch names and prefixes commit messages",
-  "version": "1.0.2",
+  "description": "Automatically extracts ticket codes from branch names and prefixes commit messages (VS Code and Cursor)",
+  "version": "1.1.0",
   "publisher": "Blevins83",
   "icon": "icon.png",
   "repository": {
@@ -19,7 +19,8 @@
     "ticket",
     "automation",
     "jira",
-    "workflow"
+    "workflow",
+    "cursor"
   ],
   "engines": {
     "vscode": "^1.74.0"
@@ -59,6 +60,11 @@
           "type": "string",
           "default": "([A-Za-z]+)-?(\\d+)",
           "description": "Regular expression pattern to match ticket codes in branch names. Default pattern matches any letters followed by optional dash and numbers (e.g., PROJ-123, feature123, ABC-456, JIRA-789)"
+        },
+        "gitCommitHelper.aiAssisted": {
+          "type": "boolean",
+          "default": true,
+          "description": "Insert ai(assisted) after the ticket code (e.g. PROJ-123: ai(assisted) message)"
         }
       }
     }
@@ -72,9 +78,13 @@
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "vsix": "vsce package",
+    "publish:ovsx": "ovsx publish"
   },
   "devDependencies": {
+    "@vscode/vsce": "^4.0.0",
+    "ovsx": "^1.2.0",
     "@types/vscode": "^1.74.0",
     "@types/mocha": "^10.0.9",
     "@types/node": "20.x",

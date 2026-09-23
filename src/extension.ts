@@ -32,6 +32,34 @@ interface Branch {
 	readonly name: string;
 }
 
+const AI_ASSISTED_TAG = 'ai(assisted)';
+
+function buildCommitPrefix(ticketCode: string, aiAssisted: boolean): string {
+	return aiAssisted ? `${ticketCode}: ${AI_ASSISTED_TAG} ` : `${ticketCode}: `;
+}
+
+/**
+ * Return the prefixed message, or null if the value already has the desired prefix.
+ * Upgrades `TICKET: rest` to `TICKET: ai(assisted) rest` when the AI tag is enabled.
+ */
+function applyCommitPrefix(currentValue: string, ticketCode: string, aiAssisted: boolean): string | null {
+	const desired = buildCommitPrefix(ticketCode, aiAssisted);
+	if (currentValue.startsWith(desired)) {
+		return null;
+	}
+
+	const legacy = `${ticketCode}: `;
+	if (aiAssisted && currentValue.startsWith(legacy)) {
+		const remainder = currentValue.slice(legacy.length);
+		if (remainder.startsWith(`${AI_ASSISTED_TAG} `) || remainder === AI_ASSISTED_TAG) {
+			return null;
+		}
+		return `${desired}${remainder}`;
+	}
+
+	return `${desired}${currentValue}`;
+}
+
 /**
  * Git Commit Helper class that manages the automatic prefixing of commit messages
  */
@@ -202,24 +230,39 @@ class GitCommitHelper {
 				return;
 			}
 
-			const prefix = `${ticketCode}: `;
-			
-			// Only add prefix if it's not already there and we haven't added it before
-			if (newValue && !newValue.startsWith(prefix) && !hasAddedPrefix) {
-				console.log(`✅ Adding prefix "${prefix}" to commit message: "${newValue}"`);
-				isUpdating = true;
-				hasAddedPrefix = true;
-				repository.inputBox.value = prefix + newValue;
-				setTimeout(() => { 
-					isUpdating = false; 
-				}, 100);
-			} else if (!newValue) {
-				// Reset flag when input is cleared
+			const aiAssisted = config.get<boolean>('aiAssisted', true);
+			const desiredPrefix = buildCommitPrefix(ticketCode, aiAssisted);
+
+			if (!newValue) {
 				console.log('🧹 Input cleared, resetting prefix flag');
 				hasAddedPrefix = false;
-			} else {
-				console.log(`⏭️ Skipping prefix - already present or conditions not met. Value: "${newValue}", hasPrefix: ${newValue.startsWith(prefix)}, hasAddedPrefix: ${hasAddedPrefix}`);
+				return;
 			}
+
+			const nextValue = applyCommitPrefix(newValue, ticketCode, aiAssisted);
+			if (!nextValue) {
+				hasAddedPrefix = true;
+				console.log(`⏭️ Prefix already present. Value: "${newValue}"`);
+				return;
+			}
+
+			const isLegacyUpgrade =
+				aiAssisted &&
+				newValue.startsWith(`${ticketCode}: `) &&
+				!newValue.startsWith(desiredPrefix);
+
+			if (hasAddedPrefix && !isLegacyUpgrade) {
+				console.log(`⏭️ Skipping prefix - already applied. Value: "${newValue}"`);
+				return;
+			}
+
+			console.log(`✅ Applying prefix "${desiredPrefix.trim()}" to commit message: "${newValue}"`);
+			isUpdating = true;
+			hasAddedPrefix = true;
+			repository.inputBox.value = nextValue;
+			setTimeout(() => {
+				isUpdating = false;
+			}, 100);
 		}, 200);
 
 		// More aggressive monitoring for input box changes

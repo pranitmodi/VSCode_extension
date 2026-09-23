@@ -2,6 +2,16 @@
 
 All notable changes to the "Git Commit Helper by PranitModi" extension will be documented in this file.
 
+## [1.1.0] - 2026-09-22
+
+### Added
+- Prefix commit messages with `ai(assisted)` after the Jira ticket: `PROJ-123: ai(assisted) your message`
+- Setting `gitCommitHelper.aiAssisted` (default `true`) to turn the AI tag off
+- Cursor support via the same Git API; publish 1.1.0 to Open VSX so Cursor’s marketplace can list it
+
+### Changed
+- Existing `TICKET: message` input is upgraded once to `TICKET: ai(assisted) message`
+
 ## [1.0.2] - 2025-09-24
 
 ### Fixed
